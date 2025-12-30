@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shluchim Event Manager</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Icons from lucide (simplified)
+        const Hotel = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21h18M3 10h18M3 7l9-4 9 4M4 10v11m16-11v11"/></svg>;
+        const Users = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M8 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6m3-3h-6"/></svg>;
+        const Plus = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14m-7-7h14"/></svg>;
+        const X = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m18 6-12 12m0-12 12 12"/></svg>;
+        const ChevronDown = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>;
+        const ChevronRight = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>;
+        const Check = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5"/></svg>;
+        const Search = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>;
+        const Bus = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6v6M16 6v6M2 12h19.6M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2V10c0-2.3-1.7-4-4-4H6c-2.3 0-4 1.7-4 4v4c0 .4.1.8.2 1.2.3 1.1.8 2.8.8 2.8h3M13 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0ZM5 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0Z"/></svg>;
+        const FileText = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>;
+        const AlertCircle = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+
+        const storage = {
+          async get(key) {
+            const value = localStorage.getItem(key);
+            return value ? { value } : null;
+          },
+          async set(key, value) {
+            localStorage.setItem(key, value);
+            return { key, value };
+          }
+        };
+
+        function AttendeeManager() {
+          const [activeTab, setActiveTab] = useState('hotel');
+          const [attendees, setAttendees] = useState([]);
+          const [rooms, setRooms] = useState([]);
+          const [loading, setLoading] = useState(true);
+          const [searchTerm, setSearchTerm] = useState('');
+          const [filterCategory, setFilterCategory] = useState('all');
+          const [showAddModal, setShowAddModal] = useState(false);
+
+          useEffect(() => {
+            loadData();
+          }, []);
+
+          const loadData = async () => {
+            try {
+              const attendeesResult = await storage.get('attendees');
+              const roomsResult = await storage.get('rooms');
+              
+              if (attendeesResult) {
+                setAttendees(JSON.parse(attendeesResult.value));
+              } else {
+                const sampleAttendees = [
+                  {
+                    id: '1', firstName: 'Danny', lastName: 'Abelev', title: 'Rabbi', category: 'Shliach',
+                    email: 'danny@example.com', phone: '555-0100', privateRoom: false,
+                    roomPreference: 'Gavriel Isenberg, Hirschel Gourarie, Ari Weindruch',
+                    dietaryRestrictions: '', city: 'Brooklyn', state: 'NY',
+                    checkin: '2025-08-05', checkout: '2025-08-07', tshirtSize: 'L',
+                    busFromCH: true, busToCH: true, notes: ''
+                  },
+                  {
+                    id: '2', firstName: 'Ari', lastName: 'Goodman', title: 'Rabbi', category: 'Shliach',
+                    email: 'ari@example.com', phone: '555-0101', privateRoom: false,
+                    roomPreference: 'Danny Abelev', dietaryRestrictions: 'Gluten free',
+                    city: 'Miami', state: 'FL', checkin: '2025-08-05', checkout: '2025-08-07',
+                    tshirtSize: 'M', busFromCH: true, busToCH: true, notes: 'Needs ground floor'
+                  }
+                ];
+                setAttendees(sampleAttendees);
+                await storage.set('attendees', JSON.stringify(sampleAttendees));
+              }
+
+              if (roomsResult) {
+                setRooms(JSON.parse(roomsResult.value));
+              } else {
+                setRooms([]);
+                await storage.set('rooms', JSON.stringify([]));
+              }
+            } catch (error) {
+              console.error('Error loading data:', error);
+            } finally {
+              setLoading(false);
+            }
+          };
+
+          const saveAttendees = async (updated) => {
+            setAttendees(updated);
+            await storage.set('attendees', JSON.stringify(updated));
+          };
+
+          const saveRooms = async (updated) => {
+            setRooms(updated);
+            await storage.set('rooms', JSON.stringify(updated));
+          };
+
+          const filteredAttendees = attendees.filter(a => {
+            const matchesSearch = `${a.firstName} ${a.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              a.email.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesCategory = filterCategory === 'all' || a.category === filterCategory;
+            return matchesSearch && matchesCategory;
+          });
+
+          const assignedIds = new Set(rooms.flatMap(r => [r.guest1Id, r.guest2Id].filter(Boolean)));
+          const unassignedAttendees = attendees.filter(a => !assignedIds.has(a.id));
+
+          const createRoom = async () => {
+            const newRoom = {
+              id: `room-${Date.now()}`,
+              number: `Room ${rooms.length + 1}`,
+              type: '2 Queen',
+              guest1Id: null,
+              guest2Id: null
+            };
+            await saveRooms([...rooms, newRoom]);
+          };
+
+          const assignToRoom = async (roomId, pos, attendeeId) => {
+            const updated = rooms.map(room => {
+              if (room.id === roomId) {
+                const attendee = attendees.find(a => a.id === attendeeId);
+                if (attendee.privateRoom && pos === 'guest2') {
+                  alert('Cannot assign a roommate to someone with a private room');
+                  return room;
+                }
+                const otherGuestId = pos === 'guest1' ? room.guest2Id : room.guest1Id;
+                if (otherGuestId) {
+                  const otherGuest = attendees.find(a => a.id === otherGuestId);
+                  if (otherGuest?.privateRoom) {
+                    alert('Cannot assign a roommate to this room');
+                    return room;
+                  }
+                }
+                return { ...room, [pos + 'Id']: attendeeId, type: attendee.privateRoom ? 'King' : '2 Queen' };
+              }
+              return room;
+            });
+            await saveRooms(updated);
+          };
+
+          const removeFromRoom = async (roomId, pos) => {
+            const updated = rooms.map(r => r.id === roomId ? { ...r, [pos + 'Id']: null } : r);
+            await saveRooms(updated);
+          };
+
+          const deleteRoom = async (roomId) => {
+            await saveRooms(rooms.filter(r => r.id !== roomId));
+          };
+
+          const addAttendee = async (data) => {
+            const newAttendee = { ...data, id: `att-${Date.now()}` };
+            await saveAttendees([...attendees, newAttendee]);
+            setShowAddModal(false);
+          };
+
+          if (loading) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+                <div className="text-slate-600 text-lg">Loading...</div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+              <header className="bg-white border-b shadow-sm">
+                <div className="max-w-7xl mx-auto px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h1 className="text-2xl font-bold text-slate-900">Shluchim Event Manager</h1>
+                      <p className="text-sm text-slate-600 mt-1">Kinus 5785 • August 5-7, 2025</p>
+                    </div>
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Attendee
+                    </button>
+                  </div>
+                </div>
+              </header>
+
+              <div className="bg-white border-b">
+                <div className="max-w-7xl mx-auto px-6">
+                  <nav className="flex gap-1">
+                    {[
+                      { id: 'hotel', icon: Hotel, label: 'Hotel Assignment' },
+                      { id: 'attendees', icon: Users, label: 'All Attendees' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+                          activeTab === tab.id
+                            ? 'border-blue-600 text-blue-600 bg-blue-50'
+                            : 'border-transparent text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <tab.icon className="w-4 h-4" />
+                        {tab.label}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+              </div>
+
+              <main className="max-w-7xl mx-auto px-6 py-6">
+                {activeTab === 'hotel' && (
+                  <HotelView
+                    rooms={rooms}
+                    attendees={attendees}
+                    unassignedAttendees={unassignedAttendees}
+                    onCreateRoom={createRoom}
+                    onAssign={assignToRoom}
+                    onRemove={removeFromRoom}
+                    onDelete={deleteRoom}
+                  />
+                )}
+
+                {activeTab === 'attendees' && (
+                  <AttendeesView
+                    attendees={filteredAttendees}
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    filterCategory={filterCategory}
+                    setFilterCategory={setFilterCategory}
+                  />
+                )}
+              </main>
+
+              {showAddModal && (
+                <AddModal onClose={() => setShowAddModal(false)} onAdd={addAttendee} />
+              )}
+            </div>
+          );
+        }
+
+        function HotelView({ rooms, attendees, unassignedAttendees, onCreateRoom, onAssign, onRemove, onDelete }) {
+          const [expanded, setExpanded] = useState(null);
+          const getAttendee = (id) => attendees.find(a => a.id === id);
+
+          return (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <StatCard label="Total Rooms" value={rooms.length} icon={Hotel} color="blue" />
+                <StatCard label="Assigned" value={rooms.filter(r => r.guest1Id).length} icon={Check} color="green" />
+                <StatCard label="Unassigned" value={unassignedAttendees.length} icon={Users} color="orange" />
+                <StatCard label="Private" value={rooms.filter(r => r.type === 'King').length} icon={Hotel} color="purple" />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div>
+                  <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-3">
+                      <h3 className="text-white font-semibold">Unassigned ({unassignedAttendees.length})</h3>
+                    </div>
+                    <div className="p-4 max-h-[600px] overflow-y-auto space-y-2">
+                      {unassignedAttendees.map(a => (
+                        <div key={a.id} className="bg-slate-50 p-3 rounded-lg">
+                          <div className="font-medium">{a.title} {a.firstName} {a.lastName}</div>
+                          <div className="text-sm text-slate-600">{a.category}</div>
+                          {a.privateRoom && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Private</span>}
+                          {a.roomPreference && <div className="text-xs bg-blue-50 text-blue-700 p-2 rounded mt-2">Prefers: {a.roomPreference}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex justify-between">
+                      <h3 className="text-white font-semibold">Rooms ({rooms.length})</h3>
+                      <button onClick={onCreateRoom} className="px-3 py-1 bg-white text-blue-600 rounded-lg text-sm font-medium">+ New Room</button>
+                    </div>
+                    <div className="p-4 max-h-[600px] overflow-y-auto space-y-3">
+                      {rooms.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                          <Hotel className="w-16 h-16 mx-auto mb-3 opacity-30" />
+                          <button onClick={onCreateRoom} className="text-blue-600 font-medium">Create your first room</button>
+                        </div>
+                      ) : (
+                        rooms.map(room => (
+                          <RoomCard
+                            key={room.id}
+                            room={room}
+                            guest1={getAttendee(room.guest1Id)}
+                            guest2={getAttendee(room.guest2Id)}
+                            unassignedAttendees={unassignedAttendees}
+                            expanded={expanded === room.id}
+                            onToggle={() => setExpanded(expanded === room.id ? null : room.id)}
+                            onAssign={onAssign}
+                            onRemove={onRemove}
+                            onDelete={onDelete}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        function RoomCard({ room, guest1, guest2, unassignedAttendees, expanded, onToggle, onAssign, onRemove, onDelete }) {
+          const [showG1, setShowG1] = useState(false);
+          const [showG2, setShowG2] = useState(false);
+          const isPrivate = guest1?.privateRoom || guest2?.privateRoom;
+          const canAddG2 = guest1 && !isPrivate;
+
+          return (
+            <div className="border rounded-lg bg-slate-50">
+              <div className="bg-white px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button onClick={onToggle} className="text-slate-400">
+                    {expanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                  </button>
+                  <div>
+                    <div className="font-semibold">{room.number}</div>
+                    <div className="text-xs text-slate-500">{room.type}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isPrivate && <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">Private</span>}
+                  <button onClick={() => onDelete(room.id)} className="text-red-500 hover:text-red-700">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {expanded && (
+                <div className="p-4 space-y-3">
+                  <div className="bg-white rounded-lg p-3 border">
+                    <div className="text-xs font-medium text-slate-500 mb-2">Guest #1</div>
+                    {guest1 ? (
+                      <div>
+                        <div className="flex justify-between">
+                          <div>
+                            <div className="font-medium">{guest1.title} {guest1.firstName} {guest1.lastName}</div>
+                            <div className="text-sm text-slate-600">{guest1.category}</div>
+                          </div>
+                          <button onClick={() => onRemove(room.id, 'guest1')} className="text-red-500"><X className="w-4 h-4" /></button>
+                        </div>
+                        {guest1.roomPreference && <div className="text-xs bg-blue-50 text-blue-700 p-2 rounded mt-2">Prefers: {guest1.roomPreference}</div>}
+                      </div>
+                    ) : !showG1 ? (
+                      <button onClick={() => setShowG1(true)} className="w-full py-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-blue-400">+ Assign</button>
+                    ) : (
+                      <select onChange={(e) => { if (e.target.value) { onAssign(room.id, 'guest1', e.target.value); setShowG1(false); } }} className="w-full border rounded-lg px-3 py-2">
+                        <option value="">Select...</option>
+                        {unassignedAttendees.map(a => <option key={a.id} value={a.id}>{a.title} {a.firstName} {a.lastName}</option>)}
+                      </select>
+                    )}
+                  </div>
+
+                  {!isPrivate && (
+                    <div className="bg-white rounded-lg p-3 border">
+                      <div className="text-xs font-medium text-slate-500 mb-2">Guest #2</div>
+                      {guest2 ? (
+                        <div>
+                          <div className="flex justify-between">
+                            <div>
+                              <div className="font-medium">{guest2.title} {guest2.firstName} {guest2.lastName}</div>
+                              <div className="text-sm text-slate-600">{guest2.category}</div>
+                            </div>
+                            <button onClick={() => onRemove(room.id, 'guest2')} className="text-red-500"><X className="w-4 h-4" /></button>
+                          </div>
+                          {guest2.roomPreference && <div className="text-xs bg-blue-50 text-blue-700 p-2 rounded mt-2">Prefers: {guest2.roomPreference}</div>}
+                        </div>
+                      ) : canAddG2 ? !showG2 ? (
+                        <button onClick={() => setShowG2(true)} className="w-full py-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-blue-400">+ Assign</button>
+                      ) : (
+                        <select onChange={(e) => { if (e.target.value) { onAssign(room.id, 'guest2', e.target.value); setShowG2(false); } }} className="w-full border rounded-lg px-3 py-2">
+                          <option value="">Select...</option>
+                          {unassignedAttendees.map(a => <option key={a.id} value={a.id}>{a.title} {a.firstName} {a.lastName}</option>)}
+                        </select>
+                      ) : (
+                        <div className="py-2 text-center text-slate-400 text-sm">Assign Guest #1 first</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        function AttendeesView({ attendees, searchTerm, setSearchTerm, filterCategory, setFilterCategory }) {
+          const categories = ['all', 'Shliach', 'COCI Team', 'Presenter', 'Staff'];
+
+          return (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl shadow-sm border p-4">
+                <div className="flex gap-4 flex-wrap">
+                  <div className="flex-1 min-w-[300px] relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border rounded-lg"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    {categories.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setFilterCategory(cat)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                          filterCategory === cat ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {cat === 'all' ? 'All' : cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Category</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Contact</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Location</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {attendees.map(a => (
+                        <tr key={a.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium">{a.title} {a.firstName} {a.lastName}</td>
+                          <td className="px-4 py-3"><span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">{a.category}</span></td>
+                          <td className="px-4 py-3 text-sm">{a.email}</td>
+                          <td className="px-4 py-3 text-sm">{a.city}, {a.state}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        function AddModal({ onClose, onAdd }) {
+          const [data, setData] = useState({
+            firstName: '', lastName: '', title: 'Rabbi', category: 'Shliach', email: '', phone: '',
+            city: '', state: '', privateRoom: false, roomPreference: '', dietaryRestrictions: '',
+            checkin: '2025-08-05', checkout: '2025-08-07', tshirtSize: 'L',
+            busFromCH: false, busToCH: false, notes: ''
+          });
+
+          return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between">
+                  <h2 className="text-xl font-bold">Add New Attendee</h2>
+                  <button onClick={onClose} className="text-slate-400"><X className="w-6 h-6" /></button>
+                </div>
+                
+                <form onSubmit={(e) => { e.preventDefault(); onAdd(data); }} className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">First Name *</label>
+                      <input required value={data.firstName} onChange={(e) => setData({...data, firstName: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Last Name *</label>
+                      <input required value={data.lastName} onChange={(e) => setData({...data, lastName: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={data.privateRoom} onChange={(e) => setData({...data, privateRoom: e.target.checked})} />
+                      <span className="text-sm font-medium">Private Room</span>
+                    </label>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border rounded-lg">Cancel</button>
+                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg">Add Attendee</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        }
+
+        function StatCard({ label, value, icon: Icon, color }) {
+          const colors = {
+            blue: 'from-blue-500 to-blue-600',
+            green: 'from-green-500 to-green-600',
+            orange: 'from-orange-500 to-orange-600',
+            purple: 'from-purple-500 to-purple-600'
+          };
+
+          return (
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className={`bg-gradient-to-r ${colors[color]} px-4 py-3 flex items-center justify-between`}>
+                <div>
+                  <div className="text-white text-2xl font-bold">{value}</div>
+                  <div className="text-white text-sm opacity-90">{label}</div>
+                </div>
+                <Icon className="w-8 h-8 text-white opacity-80" />
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AttendeeManager />);
+    </script>
+</body>
+</html>
